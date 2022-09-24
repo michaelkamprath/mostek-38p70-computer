@@ -1,0 +1,54 @@
+LED_PATTERN_SPR = 0
+DELAY_COUNTER_SPR = 4
+SHORT_DELAY_COUNT = 128
+
+LED_PORT = 5
+
+init:
+    ; set LED pattern to 0
+    clr
+    lis b0001
+    lr LED_PATTERN_SPR,a  
+    outs LED_PORT            
+start:
+
+left_chase:
+    lis b0010
+    lr LED_PATTERN_SPR,a
+    outs LED_PORT
+.loop:
+    pi delay_short
+    lr a,LED_PATTERN_SPR
+    sl 1
+    bz right_chase
+    lr LED_PATTERN_SPR,a
+    outs LED_PORT
+    br .loop
+right_chase:
+    li b01000000
+    lr LED_PATTERN_SPR,a
+    outs LED_PORT
+.loop:
+    pi delay_short
+    lr a,LED_PATTERN_SPR
+    sr 1
+    bz left_chase
+    lr LED_PATTERN_SPR,a
+    outs LED_PORT
+    br .loop
+
+delay_short:
+    clr                         ; set accumulator to zero
+    lr DELAY_COUNTER_SPR,a      ; initialize counter in scratch pad
+.loop:
+    inc                         ; count to 255
+    bnc .loop
+    lr a,DELAY_COUNTER_SPR
+    inc
+    ci SHORT_DELAY_COUNT        ; see if outer loop is done
+    bz .done
+    lr DELAY_COUNTER_SPR,a
+    clr
+    br .loop
+.done:
+    pop

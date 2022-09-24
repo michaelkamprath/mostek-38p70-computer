@@ -1,0 +1,4 @@
+(sym_lib_table
+  (lib (name "mostek_3870")(type "KiCad")(uri "${KIPRJMOD}/mostek_3870.kicad_sym")(options "")(descr ""))
+  (lib (name "bargraphled_8p")(type "KiCad")(uri "${KIPRJMOD}/bargraphled_8p.kicad_sym")(options "")(descr ""))
+)
