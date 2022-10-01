@@ -1,0 +1,18 @@
+#require "mostek-3870-asm >= 0.0.1"
+
+; clear_scratchpad
+; 
+;   Causes all scratch pad memory location values to be set to 0
+; 
+clear_scratchpad:
+    li $3f          ; initialize ISAR
+    lr 0,a          ; save into r0
+.loop:
+    lr a,0          ; load current ISAR pointer value
+    lr is,a         ; place ISAR in IS register
+    clr             ; clear A
+    lr [is],a       ; clear scratch pad reg
+    ds 0            ; descrement ISAR pointer
+    bnz .loop       ; iterate
+.done:
+    pop             ; return

@@ -3,14 +3,15 @@
 The assembly code using this directory uses **[BespokeASM](https://github.com/michaelkamprath/bespokeasm)** as an assembler. The MOSTEK 3870 ISA configuration file can be found here. The command to compile the `af8` assembly code files in this directory is:
 
 ```sh
-bespokeasm compile -e 2047 -p -c /path/to/mostek-3870.yaml assembly-code.af8
+bespokeasm compile -e 2047 -p -c /path/to/mostek-3870.yaml -I ./common/ assembly-code.af8
 ```
 
 Where:
 
-* `-e 2047` : generates a binary image with the maximum address of 2047, thus 2K bytes for a M2716 EPROM.
+* `-e 2047` : generates a binary image with the maximum address of 2047, thus 2K bytes for a M2716 EPROM. Adjust if a differently sized EPROM is being used.
 * `-p` : emit a pretty-print listing of the compiled assembly code.
 * `-c /path/to/mostek-3870.yaml` : The path to the MOSTEK 3870 ISA BespokeASM configuration file found in the `examples` directory of the [**BespokeASM** repository](https://github.com/michaelkamprath/bespokeasm).
+* `-I ./common/` : Adds the `common` directory in this directory to the search path for include files.
 * `assembly-code.af8` : The MOSTEK 3870 assembly code to compile.
 
 ## Programming a M2716 EPROM with a MiniPro
