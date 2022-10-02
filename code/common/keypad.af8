@@ -7,8 +7,9 @@
 ;   0-3 are connected to P1-4 to P1-7. The key number for each
 ;   key is shown below int eh KEYPAD_* constants.
 ; 
-;   Uses scratch pad memory $2D to $3F. While operating, also uses
-;   scrath pad registers 4-11. 
+;   Uses scratch pad memory $2D to $3F, which should be preserved across
+;   calls to keyscan. While keyscan is operating, it will use scrath pad
+;   registers 4-11. 
 ; 
 ;   Will debounce down presses. (TODO: debounce button releases)
 ; 
@@ -40,7 +41,7 @@ KEYPAD_A = 3
 KEYPAD_B = 7
 KEYPAD_C = 11
 KEYPAD_D = 15 
-
+KEYPAD_NONE = $FF
 
 KEYPAD_PORT = 1
 
@@ -150,7 +151,7 @@ keyscan:
     ; set current key press to $FF to indicate no key pressed
     li CURRENT_KEY_SP
     lr is,a
-    li $FF
+    li KEYPAD_NONE
     lr [is],a
     ; save ACTIVE_KEYS_SP+1 value (low byte of active keys) into _TEMP_SP
     li ACTIVE_KEYS_SP+1
@@ -201,6 +202,9 @@ keyscan:
     br .key_loop_continue
 
 .return_keyscan:
+    ;reset key pad port before deeparting
+    lis 0
+    outs KEYPAD_PORT
     pop
 
 
@@ -209,12 +213,18 @@ keyscan:
 ;   places into scratch pad 0 the value of the key in CURRENT_KEY_SP
 ; 
 fetch_keypad_value:
-    dci _keypad_value_table     ; place table addres in data counter
     li CURRENT_KEY_SP
     lr is,a
     lr a,[is]                   ; load A with key index
+    ci KEYPAD_NONE              ; check to see if no key is pressed
+    bnz .return_value
+    clr
+    br .done   
+.return_value:
+    dci _keypad_value_table     ; place table addres in data counter
     adc                         ; add key index to data counter
     lm                          ; load A with memory pointed to by data counter
+.done:
     lr 0,a                      ; load A into scratch pad 0
     pop                         ; return
 
@@ -223,12 +233,18 @@ fetch_keypad_value:
 ;   places into scratch pad 0 the character of the key in CURRENT_KEY_SP
 ; 
 fetch_keypad_character:
-    dci _keypad_char_table      ; place table addres in data counter
     li CURRENT_KEY_SP
     lr is,a
     lr a,[is]                   ; load A with key index
+    ci KEYPAD_NONE              ; check to see if no key is pressed
+    bnz .return_value
+    clr
+    br .done
+.return_value:
+    dci _keypad_char_table      ; place table addres in data counter
     adc                         ; add key index to data counter
     lm                          ; load A with memory pointed to by data counter
+.done:
     lr 0,a                      ; load A into scratch pad 0
     pop                         ; return
 

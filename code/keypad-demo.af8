@@ -1,0 +1,20 @@
+#require "mostek-3870-asm >= 0.0.1"
+
+LED_PORT = 5
+
+
+init:
+    ; clear outall scratch pads
+    pi clear_scratchpad
+    ; set status LEDs off
+    clr
+    outs LED_PORT
+start:
+    pi keyscan
+    pi fetch_keypad_value
+    lr a,0
+    outs LED_PORT
+    br start
+
+#include "keypad.af8"
+#include "utility.af8"
