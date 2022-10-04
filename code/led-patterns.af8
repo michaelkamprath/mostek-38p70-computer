@@ -31,6 +31,9 @@ OPTION_PULSAR = 3
 OPTION_PULSAR_INVERSE = 4
 OPTION_BINARY_COUNTER = 5
 
+MIN_OPTION_VALUE = OPTION_KNIGHT_RIDER
+MAX_OPTION_VALUE = OPTION_BINARY_COUNTER
+
 
 init:
     ; clear outall scratch pads
@@ -62,34 +65,22 @@ main_loop:
     ci MAIN_LOOP_DELAY_COUNT
     bnz .main_keyscan_loop
 pattern_update:
-    ; star key not selected, update LED pattern
-    lr a,PATTERN_SELECT_SPR
-    ; check for knight rider pattern
-    ci OPTION_KNIGHT_RIDER
-    bnz .next1
+    dci .pattern_update_jump_table  ; place image update jump table in data counter
+    clr
+    as PATTERN_SELECT_SPR
+    as PATTERN_SELECT_SPR
+    as PATTERN_SELECT_SPR           ; calculate jump table offset (3 bytes per entry)
+    adc                             ; add offset to jump table address
+    lr q,dc                         ; move calculated address to Q
+    lr p0,q                         ; move q into program counter to effect the jump
+
+.pattern_update_jump_table:
+    jmp main_loop                   ; dummy entry since option values start at 1
     jmp update_knight_rider
-.next1:
-    ; check for inverse knight rider
-    ci OPTION_KNIGHT_RIDER_INVERSE
-    bnz .next2
     jmp update_knight_rider
-.next2:
-    ; check for pulsar
-    ci OPTION_PULSAR
-    bnz .next3
     jmp update_pulsar
-.next3:
-    ; check for pulsar
-    ci OPTION_PULSAR_INVERSE
-    bnz .next4
     jmp update_pulsar
-.next4:
-    ; check for bindary counter
-    ci OPTION_BINARY_COUNTER
-    bnz .next5
     jmp update_binary_counter
-.next5:
-    br main_loop
 
 main_leds_show:
     lr a,CURRENT_LEDS_SPR
@@ -97,7 +88,7 @@ main_leds_show:
     br main_loop
 
 ;
-; Memu Loop
+; Menu Loop
 ; 
 ; Looks for a key press indicating a valid LED pattern to show
 ; 
@@ -111,42 +102,57 @@ menu_loop:
 .menu_start:
     ; look for key of enabled options
     pi keyscan
-    lris a,CURRENT_KEY_SP
+    pi fetch_keypad_value
+    lr a,0
+    ; first, enforce values
+    ci MAX_OPTION_VALUE
+    bnc .menu_loop_end              ; option > MAX_OPTION_VALUE, continue with loop
+    ci 0
+    bz .menu_loop_end               ; option value = 0 not allowed either
+    ; now build jumptable offset
+    lr PATTERN_SELECT_SPR,a         ; move validated key value to A
+    dci .key_selection_jump_table   ; place table addres in data counter
+    clr                             ; set A to zero
+    as PATTERN_SELECT_SPR
+    as PATTERN_SELECT_SPR           ; add key index 2 times to represent 2 bytes per jump (br) entry
+    adc                             ; add step index to data counter
+    lr q,dc                         ; move calculated address to Q
+    lr p0,q                         ; move q into program counter to effect the jump
+
+.key_selection_jump_table:
+    br .menu_loop_end               ; dummy entry since option values tart at 1
+    br .knight_rider
+    br .knight_rider_inverse
+    br .pulsar
+    br .pulsar_inverse
+    br .binary_counter
+
+.knight_rider:
     ; Knight Rider
-    ci KEYPAD_1
-    bnz .next1
     lis OPTION_KNIGHT_RIDER
     lr PATTERN_SELECT_SPR,a
     br start_knight_rider
-.next1:
-    ; Knight Rider Invers
-    ci KEYPAD_2
-    bnz .next2
+.knight_rider_inverse:
+    ; Knight Rider Inverse
     lis OPTION_KNIGHT_RIDER_INVERSE
     lr PATTERN_SELECT_SPR,a
     br start_knight_rider
-.next2:
+.pulsar:
     ; Pulsar
-    ci KEYPAD_3
-    bnz .next3
     lis OPTION_PULSAR
     lr PATTERN_SELECT_SPR,a
     br start_pulsar
-.next3:
+.pulsar_inverse:
     ; Pulsar
-    ci KEYPAD_4
-    bnz .next4
     lis OPTION_PULSAR_INVERSE
     lr PATTERN_SELECT_SPR,a
     br start_pulsar
-.next4:
+.binary_counter:
     ; Pulsar
-    ci KEYPAD_5
-    bnz .next5
     lis OPTION_BINARY_COUNTER
     lr PATTERN_SELECT_SPR,a
     br start_binary_counter
-.next5:
+.menu_loop_end:
     ; toggle menu LED
     lr a,TIMER_COUNT_SPR
     inc
@@ -169,6 +175,7 @@ menu_loop:
 ;       PATTERN_STATUS_SPR
 ;           0 = moving right
 ;           1 = moving left
+;
 
 start_knight_rider:
     lis 1
@@ -218,9 +225,8 @@ update_knight_rider:
 ; Pulsar
 ; 
 ; Grows and shrinks LEDs on from middle
-;       PATTERN_STATUS_SPR
-;           0 = growing
-;           1 = shrinking
+;       PATTERN_STATUS_SPR := the current "image" frame
+;
 
 pulsar_patterns:
     .byte b00000000
@@ -266,6 +272,8 @@ update_pulsar:
 ;
 ; Binary Counter
 ; 
+;       PATTERN_STATUS_SPR := the current counter value to display
+;
 
 start_binary_counter:
     clr
