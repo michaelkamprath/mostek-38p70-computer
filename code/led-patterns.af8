@@ -1,54 +1,285 @@
-LED_PATTERN_SPR = 0
-DELAY_COUNTER_SPR = 4
-SHORT_DELAY_COUNT = 128
+#require "mostek-3870-asm >= 0.0.1"
+;
+; LED Patterns
+; 
+;   Displays different patterns on bar graph LED depending on what user selects.
+;   Selection is made by first pressing '*' on key pad to enter menu mode,
+;   then selecting a number to indicate which pattern is desired. Supported options:
+; 
+;       1 : Knight Rider
+;       2 : Inverse Knight Rider
+;       3 : Pulsar
+;       4 : Inverse Pursar
+;       5 : Binary Counter
+; 
+
+PATTERN_SELECT_SPR = 0
+CURRENT_LEDS_SPR = 1
+PATTERN_STATUS_SPR = 2
+PATTERN_DATA_SPR = 3
+TIMER_COUNT_SPR = 4
+
+MENU_BLINK_DELAY_COUNT = $80
+MAIN_LOOP_DELAY_COUNT = $B0
 
 LED_PORT = 5
 
+
+OPTION_KNIGHT_RIDER = 1
+OPTION_KNIGHT_RIDER_INVERSE = 2
+OPTION_PULSAR = 3
+OPTION_PULSAR_INVERSE = 4
+OPTION_BINARY_COUNTER = 5
+
+
 init:
-    ; set LED pattern to 0
+    ; clear outall scratch pads
+    pi clear_scratchpad
+    ; set status LEDs off
     clr
-    lis b0001
-    lr LED_PATTERN_SPR,a  
-    outs LED_PORT            
-start:
+    outs LED_PORT
+    jmp menu_loop
 
-left_chase:
-    lis b0010
-    lr LED_PATTERN_SPR,a
-    outs LED_PORT
-.loop:
-    pi delay_short
-    lr a,LED_PATTERN_SPR
-    sl 1
-    bz right_chase
-    lr LED_PATTERN_SPR,a
-    outs LED_PORT
-    br .loop
-right_chase:
-    li b01000000
-    lr LED_PATTERN_SPR,a
-    outs LED_PORT
-.loop:
-    pi delay_short
-    lr a,LED_PATTERN_SPR
-    sr 1
-    bz left_chase
-    lr LED_PATTERN_SPR,a
-    outs LED_PORT
-    br .loop
-
-delay_short:
-    clr                         ; set accumulator to zero
-    lr DELAY_COUNTER_SPR,a      ; initialize counter in scratch pad
-.loop:
-    inc                         ; count to 255
-    bnc .loop
-    lr a,DELAY_COUNTER_SPR
+;
+; Main Loop
+; 
+; Runs through the current LED pattern while looking for a key press
+; to the menu key.
+; 
+main_loop:
+    clr
+    lr TIMER_COUNT_SPR,a
+.main_keyscan_loop:
+    ; first, get key status
+    pi keyscan
+    ; only key we are looking for is '*'
+    lris a,CURRENT_KEY_SP
+    ci KEYPAD_STAR
+    bz menu_loop
+    lr a,TIMER_COUNT_SPR
     inc
-    ci SHORT_DELAY_COUNT        ; see if outer loop is done
-    bz .done
-    lr DELAY_COUNTER_SPR,a
+    lr TIMER_COUNT_SPR,a
+    ci MAIN_LOOP_DELAY_COUNT
+    bnz .main_keyscan_loop
+pattern_update:
+    ; star key not selected, update LED pattern
+    lr a,PATTERN_SELECT_SPR
+    ; check for knight rider pattern
+    ci OPTION_KNIGHT_RIDER
+    bnz .next1
+    jmp update_knight_rider
+.next1:
+    ; check for inverse knight rider
+    ci OPTION_KNIGHT_RIDER_INVERSE
+    bnz .next2
+    jmp update_knight_rider
+.next2:
+    ; check for pulsar
+    ci OPTION_PULSAR
+    bnz .next3
+    jmp update_pulsar
+.next3:
+    ; check for pulsar
+    ci OPTION_PULSAR_INVERSE
+    bnz .next4
+    jmp update_pulsar
+.next4:
+    ; check for bindary counter
+    ci OPTION_BINARY_COUNTER
+    bnz .next5
+    jmp update_binary_counter
+.next5:
+    br main_loop
+
+main_leds_show:
+    lr a,CURRENT_LEDS_SPR
+    outs LED_PORT
+    br main_loop
+
+;
+; Memu Loop
+; 
+; Looks for a key press indicating a valid LED pattern to show
+; 
+
+menu_loop:
+    ; first, black LEDs
     clr
-    br .loop
-.done:
-    pop
+    outs LED_PORT
+    lr CURRENT_LEDS_SPR,a
+    lr TIMER_COUNT_SPR,a
+.menu_start:
+    ; look for key of enabled options
+    pi keyscan
+    lris a,CURRENT_KEY_SP
+    ; Knight Rider
+    ci KEYPAD_1
+    bnz .next1
+    lis OPTION_KNIGHT_RIDER
+    lr PATTERN_SELECT_SPR,a
+    br start_knight_rider
+.next1:
+    ; Knight Rider Invers
+    ci KEYPAD_2
+    bnz .next2
+    lis OPTION_KNIGHT_RIDER_INVERSE
+    lr PATTERN_SELECT_SPR,a
+    br start_knight_rider
+.next2:
+    ; Pulsar
+    ci KEYPAD_3
+    bnz .next3
+    lis OPTION_PULSAR
+    lr PATTERN_SELECT_SPR,a
+    br start_pulsar
+.next3:
+    ; Pulsar
+    ci KEYPAD_4
+    bnz .next4
+    lis OPTION_PULSAR_INVERSE
+    lr PATTERN_SELECT_SPR,a
+    br start_pulsar
+.next4:
+    ; Pulsar
+    ci KEYPAD_5
+    bnz .next5
+    lis OPTION_BINARY_COUNTER
+    lr PATTERN_SELECT_SPR,a
+    br start_binary_counter
+.next5:
+    ; toggle menu LED
+    lr a,TIMER_COUNT_SPR
+    inc
+    lr TIMER_COUNT_SPR,a
+    ci MENU_BLINK_DELAY_COUNT
+    bnz .menu_start
+    lr a,CURRENT_LEDS_SPR
+    xi 1
+    lr CURRENT_LEDS_SPR,a
+    outs LED_PORT
+    clr
+    lr TIMER_COUNT_SPR,a
+    br .menu_start
+
+
+;
+; Knight Rider
+; 
+;   scans back and forth.
+;       PATTERN_STATUS_SPR
+;           0 = moving right
+;           1 = moving left
+
+start_knight_rider:
+    lis 1
+    lr PATTERN_DATA_SPR,a
+    clr
+    lr PATTERN_STATUS_SPR,a
+    jmp pattern_update
+
+update_knight_rider:
+    lr a,PATTERN_STATUS_SPR
+    ci 0
+    bnz .knight_rider_left
+.knight_rider_right:
+    lr a,PATTERN_DATA_SPR
+    sr 1
+    lr PATTERN_DATA_SPR,a
+    bnz .knight_rider_done
+    ; set up for going right
+    li b00000010
+    lr PATTERN_DATA_SPR,a
+    lis 1
+    lr PATTERN_STATUS_SPR,a
+    br .knight_rider_done
+.knight_rider_left:
+    lr a,PATTERN_DATA_SPR
+    sl 1
+    lr PATTERN_DATA_SPR,a
+    bnz .knight_rider_done
+    ; set up for going right
+    li b01000000
+    lr PATTERN_DATA_SPR,a
+    clr
+    lr PATTERN_STATUS_SPR,a
+    br .knight_rider_done
+.knight_rider_done:
+    lr a,PATTERN_SELECT_SPR
+    ci OPTION_KNIGHT_RIDER_INVERSE
+    lr a,PATTERN_DATA_SPR
+    bnz .knight_rider_leds
+    com
+.knight_rider_leds:
+    lr CURRENT_LEDS_SPR,a
+    jmp main_leds_show
+
+
+;
+; Pulsar
+; 
+; Grows and shrinks LEDs on from middle
+;       PATTERN_STATUS_SPR
+;           0 = growing
+;           1 = shrinking
+
+pulsar_patterns:
+    .byte b00000000
+    .byte b00011000
+    .byte b00111100
+    .byte b01111110
+    .byte b11111111
+    .byte b01111110
+    .byte b00111100
+    .byte b00011000
+
+PULSAR_STEPS = 8
+
+start_pulsar:
+    clr
+    lr PATTERN_STATUS_SPR,a
+    lr PATTERN_DATA_SPR,a
+    jmp pattern_update
+
+update_pulsar:
+    dci pulsar_patterns         ; place table addres in data counter
+    lr a,PATTERN_STATUS_SPR     ; get pattern step
+    adc                         ; add step index to data counter
+    lm                          ; load A with memory pointed to by data counter
+    lr PATTERN_DATA_SPR,a       ; save pattern to PATTERN_DATA_SPR
+    ; update step counter
+    lr a,PATTERN_STATUS_SPR
+    inc
+    ci PULSAR_STEPS
+    bnz .pulsar_done
+    clr
+.pulsar_done:
+    lr PATTERN_STATUS_SPR,a
+    lr a,PATTERN_SELECT_SPR
+    ci OPTION_PULSAR_INVERSE
+    lr a,PATTERN_DATA_SPR
+    bnz .pulsar_leds
+    com
+.pulsar_leds:
+    lr CURRENT_LEDS_SPR,a
+    jmp main_leds_show
+
+;
+; Binary Counter
+; 
+
+start_binary_counter:
+    clr
+    lr PATTERN_STATUS_SPR,a
+    lr PATTERN_DATA_SPR,a
+    jmp pattern_update
+
+update_binary_counter:
+    lr a,PATTERN_DATA_SPR
+    inc
+    lr PATTERN_DATA_SPR,a
+    lr CURRENT_LEDS_SPR,a
+    jmp main_leds_show
+
+#include "keypad.af8"
+#include "utility.af8"
+

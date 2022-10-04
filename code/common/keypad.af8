@@ -1,28 +1,28 @@
 #require "mostek-3870-asm >= 0.0.1"
 
 ; keyscan
-; 
+;
 ;   Created for a 16-key pad such as the AK-1604-N-BWB. Rows
-;   0-3 are connected to P1-0 through P1-3, and columns 
+;   0-3 are connected to P1-0 through P1-3, and columns
 ;   0-3 are connected to P1-4 to P1-7. The key number for each
 ;   key is shown below int eh KEYPAD_* constants.
-; 
+;
 ;   Uses scratch pad memory $2D to $3F, which should be preserved across
 ;   calls to keyscan. While keyscan is operating, it will use scrath pad
-;   registers 4-11. 
-; 
+;   registers 4-11.
+;
 ;   Will debounce down presses. (TODO: debounce button releases)
-; 
+;
 ;   The utility function clear_scratchpad should be called before strting the key
 ;   scan loop
-; 
+;
 ;   All current keys pressed are reporting in the 16-bit map in scratch pad
 ;   memory $2E and $2F, with least signficant bit (0 of $2F) representing key 0
 ;   and the most signficant bit (7 of $2E) representing key 15. Furthermore,
 ;   if only operating on 1 key pressed, the pressed key with the lowest key value
 ;   is placed in scratch pad memory $2D (CURRENT_KEY_SP). A value of $FF in this
 ;   location means no keys are pressed.
-; 
+;
 
 
 KEYPAD_0 = 13
@@ -40,7 +40,7 @@ KEYPAD_HASH = 14
 KEYPAD_A = 3
 KEYPAD_B = 7
 KEYPAD_C = 11
-KEYPAD_D = 15 
+KEYPAD_D = 15
 KEYPAD_NONE = $FF
 
 KEYPAD_PORT = 1
@@ -49,14 +49,13 @@ KEY_STATUS_SP = $30
 ACTIVE_KEYS_SP = $2E
 CURRENT_KEY_SP = $2D
 
-_ROW_NUM_SP = 4
-_COL_NUM_SP = 5
-_PORTWORD_SP = 6
-_COL_MASK_SP = 7
-_COLUMN_KEY_DATA_SP = 8
-_CURRENT_KEY_NUM_SP = 9
-_TEMP_SP = 10
-_TIMER_SP = 11
+_ROW_NUM_SP = 5
+_COL_NUM_SP = 6
+_PORTWORD_SP = 7
+_COL_MASK_SP = 8
+_COLUMN_KEY_DATA_SP = 9
+_CURRENT_KEY_NUM_SP = 10
+_TEMP_SP = 11
 
 ; number of consecutive key downs before key is considered active
 _KEY_ACTIVE_COUNT = 4
@@ -73,30 +72,30 @@ keyscan:
 .row_loop:
     lr a,_PORTWORD_SP               ; place current port word into A
     outs KEYPAD_PORT                ; write it to the keypad port
-    ins KEYPAD_PORT                 ; read in keypad port 
-    sr 4                            ; only need upper nibble of keypad port 
+    ins KEYPAD_PORT                 ; read in keypad port
+    sr 4                            ; only need upper nibble of keypad port
     lr _COLUMN_KEY_DATA_SP,a        ; save column data
     ; test each column
-    lis 3   
+    lis 3
     lr _COL_NUM_SP,a                ; init column num to 3
     lis 8
     lr _COL_MASK_SP,a               ; init column num to 3
 .col_loop:
     ; first, set IS to key status scratch pad
     li KEY_STATUS_SP
-    as _CURRENT_KEY_NUM_SP          ; add key number to 
+    as _CURRENT_KEY_NUM_SP          ; add key number to
     lr is,a                         ; place key status sratch pad location in IS
     ; not test to see if current column is pressed
     lr a,_COLUMN_KEY_DATA_SP        ; load column data
     ns _COL_MASK_SP
-    bnz .handle_key                 ; if not zero, a key is pressed 
+    bnz .handle_key                 ; if not zero, a key is pressed
     ; key is not pressed, update key status
     lr a,[is]                       ; fetch key status
     ci 0                            ; if already zero, do nothing
     bz .col_loop_next
     ; key is not pressed, set status to 0
     clr
-    lr [is],a                       
+    lr [is],a
     br .col_loop_next
 .handle_key:
     ; key is pressed, decrement key status
@@ -124,12 +123,6 @@ keyscan:
     lr a,_PORTWORD_SP
     sr 1
     lr _PORTWORD_SP,a               ; shift port word right
-    ;set up small delay
-    li _SCAN_LOOP_DELAY
-    lr _TIMER_SP,a                  ; set up timer
-.delay_loop:
-    ds _TIMER_SP
-    bnz .delay_loop                 ; wait for timer
     br .row_loop
 
 .done_keyscan:
@@ -169,23 +162,23 @@ keyscan:
     lr a,_CURRENT_KEY_NUM_SP
     ci 15                           ; ensure key value is <= 15
     bnc .return_keyscan             ; we are done with this
-    ; more keys to go
+    ; We are not at the las key yet. Update the testing mask.
     lr a,_COL_MASK_SP
     sl 1
     ci 0
     bnz .key_loop_continue2
-    ; update temp
+    ; Mask is at zedro, that means we need to more to the next byte for active keys.
+    ; need to change the byte of ACTIVE_KEYS_SP refrenced in _TEMP_SP
     li ACTIVE_KEYS_SP
     lr _TEMP_SP,a
     ; reset the mask to b00000001 for next byte of key status
-    ; need to also change the byte of ACTIVE_KEYS_SP refrenced in _TEMP_SP
-    lis 0
-    lr _TEMP_SP,a
     lis 1
 .key_loop_continue2:
     lr _COL_MASK_SP,a
     br .key_byte_loop
 .key_is_pressed:
+    ; key is considered to be pressed. Update its bit in the proper ACTIVE_KEYS_SP
+    ; byte as pointed to by _TEMP_SP.
     lr a,_TEMP_SP
     lr is,a
     lr a,[is]                       ; fetch current key status byte
@@ -202,24 +195,22 @@ keyscan:
     br .key_loop_continue
 
 .return_keyscan:
-    ;reset key pad port before deeparting
+    ;reset key pad port before departing
     lis 0
     outs KEYPAD_PORT
     pop
 
 
 ; fetch_keypad_value
-; 
+;
 ;   places into scratch pad 0 the value of the key in CURRENT_KEY_SP
-; 
+;
 fetch_keypad_value:
-    li CURRENT_KEY_SP
-    lr is,a
-    lr a,[is]                   ; load A with key index
+    lris a,CURRENT_KEY_SP       ; load A with key index
     ci KEYPAD_NONE              ; check to see if no key is pressed
     bnz .return_value
     clr
-    br .done   
+    br .done
 .return_value:
     dci _keypad_value_table     ; place table addres in data counter
     adc                         ; add key index to data counter
@@ -229,13 +220,13 @@ fetch_keypad_value:
     pop                         ; return
 
 ; fetch_keypad_character
-; 
+;
 ;   places into scratch pad 0 the character of the key in CURRENT_KEY_SP
-; 
+;
 fetch_keypad_character:
-    li CURRENT_KEY_SP
+    lris a,CURRENT_KEY_SP       ; load A with key index
     lr is,a
-    lr a,[is]                   ; load A with key index
+    lr a,[is]
     ci KEYPAD_NONE              ; check to see if no key is pressed
     bnz .return_value
     clr
@@ -282,5 +273,5 @@ _keypad_char_table:
     .byte '*'   ; KEYPAD_STAR = 12
     .byte '0'   ; KEYPAD_0 = 13
     .byte '#'   ; KEYPAD_HASH = 14
-    .byte 'D'   ; KEYPAD_D = 15 
+    .byte 'D'   ; KEYPAD_D = 15
 
