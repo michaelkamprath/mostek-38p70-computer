@@ -21,3 +21,5 @@ Programming a vintage M2716 EPROM requires a VPP of 25V per the data sheet. The 
 ```sh
 minipro -p M2716@DIP24 -w rom-data.bin --pulse 5000
 ```
+
+However, it is strongly advised that you use the more modern 28C16 EEPROM. These are lectrically the same as the vintage M2716 EPROMs, but much more convenient to use due to their ability to be electrically erased by the programmer.
