@@ -3,7 +3,7 @@
 The assembly code using this directory uses **[BespokeASM](https://github.com/michaelkamprath/bespokeasm)** as an assembler. The MOSTEK 3870 ISA configuration file can be found here. The command to compile the `af8` assembly code files in this directory is:
 
 ```sh
-bespokeasm compile -e 2047 -p -c /path/to/mostek-3870.yaml -I ./common/ assembly-code.af8
+bespokeasm compile -e 2047 -p -c /path/to/mostek-3870.yaml assembly-code.af8
 ```
 
 Where:
@@ -22,4 +22,4 @@ Programming a vintage M2716 EPROM requires a VPP of 25V per the data sheet. The 
 minipro -p M2716@DIP24 -w rom-data.bin --pulse 5000
 ```
 
-However, it is strongly advised that you use the more modern 28C16 EEPROM. These are lectrically the same as the vintage M2716 EPROMs, but much more convenient to use due to their ability to be electrically erased by the programmer.
+However, it is strongly advised that you use the more modern 28C16 EEPROM. These are electrically the same as the vintage M2716 EPROMs, but much more convenient to use due to their ability to be electrically erased by the programmer.

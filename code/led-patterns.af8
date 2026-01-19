@@ -288,6 +288,6 @@ update_binary_counter:
     lr CURRENT_LEDS_SPR,a
     jmp main_leds_show
 
-#include "keypad.af8"
-#include "utility.af8"
+#include "common/keypad.af8"
+#include "common/utility.af8"
 
