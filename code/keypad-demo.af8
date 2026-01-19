@@ -16,5 +16,5 @@ start:
     outs LED_PORT
     br start
 
-#include "keypad.af8"
-#include "utility.af8"
+#include "common/keypad.af8"
+#include "common/utility.af8"
